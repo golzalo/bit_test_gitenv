@@ -310,6 +310,26 @@ boxes:
           description: Sum of loan amounts
         - name: avg_amount
           description: Average loan amount
+  - id: 3rrg4f8k
+    kind: source
+    name: bird_schools
+    settings:
+      connector: birddatabase
+      database: BIRD
+      schema: null
+      table: schools
+  - id: ze3n9rsk
+    kind: bronze
+    name: birddatabase_schools
+    settings:
+      key:
+        - CDSCode
+      refresh:
+        mode: batch
+        cron: 17 3 * * *
+        time_zone: America/Argentina/Buenos_Aires
+        load: full
+        cursor: null
 arrows:
   - from: cxdcs7wd
     to: a9j3moaz
@@ -331,6 +351,8 @@ arrows:
     to: a1c1h6nc
   - from: nnyhh7jc
     to: 060r68b1
+  - from: 3rrg4f8k
+    to: ze3n9rsk
 files:
   - definitions/daian/bi-test/bird-bronze/gold/loans_by_region_status.sqlx
   - definitions/daian/bi-test/bird-bronze/gold/loans_by_status.sqlx
