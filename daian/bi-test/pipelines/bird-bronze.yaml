@@ -65,8 +65,6 @@ boxes:
     kind: silver
     name: loans
     settings:
-      key:
-        - loan_id
       sql: |-
         SELECT
           SAFE_CAST(`loan_id` AS INT64) AS `loan_id`,
@@ -79,6 +77,9 @@ boxes:
         FROM {birddatabase_loan}
         WHERE SAFE_CAST(`date` AS DATE) >= DATE '1994-01-01'
         QUALIFY ROW_NUMBER() OVER (PARTITION BY `loan_id` ORDER BY `date` DESC) = 1
+      materialize: table
+      key:
+        - loan_id
       checks:
         - type: not_null
           columns:
@@ -96,6 +97,7 @@ boxes:
             - C
             - D
           severity: error
+      description: BIRD loans approved from 1994-01-01 onwards, typed and deduplicated on loan_id, one row per loan (662 rows in dev as of 2026-11-13; grows as bronze loan loads new rows). Status is A finished OK, B finished unpaid, C running OK or D running in debt; rows with a null loan_id or another status go to loans_quarantine.
       columns:
         - name: loan_id
           description: Loan identifier.
@@ -112,8 +114,6 @@ boxes:
         - name: status
           description: "Repayment status: A finished OK, B finished unpaid, C running OK, D running in debt."
       quarantine: true
-      description: BIRD loans approved from 1994-01-01 onwards, typed and deduplicated on loan_id, one row per loan (617 rows in dev). Status is A finished OK, B finished unpaid, C running OK or D running in debt; rows with a null loan_id or another status go to loans_quarantine.
-      materialize: table
   - id: na4aulhh
     kind: silver
     name: accounts
