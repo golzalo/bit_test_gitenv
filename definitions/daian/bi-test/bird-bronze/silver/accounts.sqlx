@@ -1,0 +1,42 @@
+config {
+  "type": "table",
+  "schema": "silver",
+  "name": "accounts",
+  "description": "BIRD accounts created from 1994-01-01 onwards, typed and deduplicated on account_id, one row per account (3,361 rows in dev). Rows with a null account_id or an unknown frequency go to accounts_quarantine.",
+  "columns": {
+    "account_id": "Account identifier.",
+    "district_id": "District of the account's branch.",
+    "frequency": "Statement frequency code.",
+    "created_date": "Date the account was created."
+  },
+  "assertions": {
+    "nonNull": [
+      "account_id"
+    ],
+    "uniqueKeys": [
+      [
+        "account_id"
+      ]
+    ],
+    "rowConditions": [
+      "frequency IS NULL OR frequency IN ('POPLATEK MESICNE', 'POPLATEK TYDNE', 'POPLATEK PO OBRATU')"
+    ]
+  },
+  "tags": [
+    "daian",
+    "daian-bi-test-bird-bronze"
+  ]
+}
+
+SELECT * FROM (
+SELECT
+  SAFE_CAST(`account_id` AS INT64) AS `account_id`,
+  SAFE_CAST(`district_id` AS INT64) AS `district_id`,
+  `frequency`,
+  SAFE_CAST(`date` AS DATE) AS `created_date`
+FROM ${ref("birddatabase_account")}
+WHERE SAFE_CAST(`date` AS DATE) >= DATE '1994-01-01'
+QUALIFY ROW_NUMBER() OVER (PARTITION BY `account_id` ORDER BY `date` DESC) = 1
+)
+WHERE `account_id` IS NOT NULL
+  AND (`frequency` IS NULL OR `frequency` IN ('POPLATEK MESICNE', 'POPLATEK TYDNE', 'POPLATEK PO OBRATU'))

@@ -1,0 +1,42 @@
+config {
+  "type": "incremental",
+  "schema": "silver",
+  "name": "loans_quarantine",
+  "description": "Rows of loans that failed a check, kept apart by daian.",
+  "tags": [
+    "daian",
+    "daian-bi-test-bird-bronze"
+  ]
+}
+
+SELECT *, 'not_null loan_id' AS _failed_check, CURRENT_TIMESTAMP() AS _quarantined_at
+FROM (
+SELECT
+  SAFE_CAST(`loan_id` AS INT64) AS `loan_id`,
+  SAFE_CAST(`account_id` AS INT64) AS `account_id`,
+  SAFE_CAST(`date` AS DATE) AS `approved_date`,
+  SAFE_CAST(`amount` AS INT64) AS `amount`,
+  SAFE_CAST(`duration` AS INT64) AS `duration_months`,
+  SAFE_CAST(`payments` AS FLOAT64) AS `monthly_payment`,
+  `status`
+FROM ${ref("birddatabase_loan")}
+WHERE SAFE_CAST(`date` AS DATE) >= DATE '1994-01-01'
+QUALIFY ROW_NUMBER() OVER (PARTITION BY `loan_id` ORDER BY `date` DESC) = 1
+)
+WHERE NOT (`loan_id` IS NOT NULL)
+UNION ALL
+SELECT *, 'accepted_values status in A, B, C, D' AS _failed_check, CURRENT_TIMESTAMP() AS _quarantined_at
+FROM (
+SELECT
+  SAFE_CAST(`loan_id` AS INT64) AS `loan_id`,
+  SAFE_CAST(`account_id` AS INT64) AS `account_id`,
+  SAFE_CAST(`date` AS DATE) AS `approved_date`,
+  SAFE_CAST(`amount` AS INT64) AS `amount`,
+  SAFE_CAST(`duration` AS INT64) AS `duration_months`,
+  SAFE_CAST(`payments` AS FLOAT64) AS `monthly_payment`,
+  `status`
+FROM ${ref("birddatabase_loan")}
+WHERE SAFE_CAST(`date` AS DATE) >= DATE '1994-01-01'
+QUALIFY ROW_NUMBER() OVER (PARTITION BY `loan_id` ORDER BY `date` DESC) = 1
+)
+WHERE NOT ((`status` IS NULL OR `status` IN ('A', 'B', 'C', 'D')))

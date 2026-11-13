@@ -1,0 +1,41 @@
+config {
+  "type": "view",
+  "schema": "gold",
+  "name": "loans_by_status",
+  "description": "Number of loans, total and average loan amount per loan status, for BIRD loans approved from 1994-01-01. One row per status (key status); expect 4 rows (A, B, C, D).",
+  "columns": {
+    "status": "Loan status code: A, B, C or D",
+    "status_name": "Status in words: A finished OK, B finished unpaid, C running OK, D running in debt",
+    "loan_count": "Number of loans with this status",
+    "total_amount": "Sum of loan amounts",
+    "avg_amount": "Average loan amount"
+  },
+  "assertions": {
+    "nonNull": [
+      "status"
+    ],
+    "uniqueKeys": [
+      [
+        "status"
+      ]
+    ]
+  },
+  "tags": [
+    "daian",
+    "daian-bi-test-bird-bronze"
+  ]
+}
+
+SELECT
+  `status`,
+  CASE `status`
+    WHEN 'A' THEN 'Finished OK'
+    WHEN 'B' THEN 'Finished unpaid'
+    WHEN 'C' THEN 'Running OK'
+    WHEN 'D' THEN 'Running in debt'
+  END AS `status_name`,
+  COUNT(*) AS `loan_count`,
+  SUM(`amount`) AS `total_amount`,
+  AVG(`amount`) AS `avg_amount`
+FROM ${ref("loans")}
+GROUP BY `status`

@@ -1,0 +1,66 @@
+config {
+  "type": "table",
+  "schema": "silver",
+  "name": "loans_enriched",
+  "description": "BIRD loans (from 1994-01-01, per the loans box) with the district and region of their account, one row per loan_id. District comes from the bronze account copy so loans on accounts opened before 1994 keep it.",
+  "columns": {
+    "loan_id": "Loan identifier",
+    "account_id": "Account the loan belongs to",
+    "district_id": "District of the account's branch",
+    "district_name": "District name (BIRD district.A2)",
+    "region": "Region of the district (BIRD district.A3)",
+    "approved_date": "Date the loan was approved",
+    "amount": "Loan amount",
+    "duration_months": "Loan duration in months",
+    "monthly_payment": "Monthly payment",
+    "status": "Loan status code: A, B, C or D"
+  },
+  "assertions": {
+    "nonNull": [
+      "loan_id",
+      "district_id",
+      "district_name",
+      "region"
+    ],
+    "uniqueKeys": [
+      [
+        "loan_id"
+      ]
+    ],
+    "rowConditions": [
+      "status IS NULL OR status IN ('A', 'B', 'C', 'D')"
+    ]
+  },
+  "tags": [
+    "daian",
+    "daian-bi-test-bird-bronze"
+  ]
+}
+
+SELECT
+  l.`loan_id`,
+  l.`account_id`,
+  a.`district_id`,
+  d.`district_name`,
+  d.`region`,
+  l.`approved_date`,
+  l.`amount`,
+  l.`duration_months`,
+  l.`monthly_payment`,
+  l.`status`
+FROM ${ref("loans")} AS l
+LEFT JOIN (
+  SELECT
+    SAFE_CAST(`account_id` AS INT64) AS `account_id`,
+    SAFE_CAST(`district_id` AS INT64) AS `district_id`
+  FROM ${ref("birddatabase_account")}
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY SAFE_CAST(`account_id` AS INT64) ORDER BY `_loaded_at` DESC) = 1
+) AS a ON a.`account_id` = l.`account_id`
+LEFT JOIN (
+  SELECT
+    SAFE_CAST(`district_id` AS INT64) AS `district_id`,
+    SAFE_CAST(`A2` AS STRING) AS `district_name`,
+    SAFE_CAST(`A3` AS STRING) AS `region`
+  FROM ${ref("birddatabase_district")}
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY SAFE_CAST(`district_id` AS INT64) ORDER BY `_loaded_at` DESC) = 1
+) AS d ON d.`district_id` = a.`district_id`

@@ -1,0 +1,36 @@
+config {
+  "type": "incremental",
+  "schema": "silver",
+  "name": "accounts_quarantine",
+  "description": "Rows of accounts that failed a check, kept apart by daian.",
+  "tags": [
+    "daian",
+    "daian-bi-test-bird-bronze"
+  ]
+}
+
+SELECT *, 'not_null account_id' AS _failed_check, CURRENT_TIMESTAMP() AS _quarantined_at
+FROM (
+SELECT
+  SAFE_CAST(`account_id` AS INT64) AS `account_id`,
+  SAFE_CAST(`district_id` AS INT64) AS `district_id`,
+  `frequency`,
+  SAFE_CAST(`date` AS DATE) AS `created_date`
+FROM ${ref("birddatabase_account")}
+WHERE SAFE_CAST(`date` AS DATE) >= DATE '1994-01-01'
+QUALIFY ROW_NUMBER() OVER (PARTITION BY `account_id` ORDER BY `date` DESC) = 1
+)
+WHERE NOT (`account_id` IS NOT NULL)
+UNION ALL
+SELECT *, 'accepted_values frequency in POPLATEK MESICNE, POPLATEK TYDNE, POPLATEK PO OBRATU' AS _failed_check, CURRENT_TIMESTAMP() AS _quarantined_at
+FROM (
+SELECT
+  SAFE_CAST(`account_id` AS INT64) AS `account_id`,
+  SAFE_CAST(`district_id` AS INT64) AS `district_id`,
+  `frequency`,
+  SAFE_CAST(`date` AS DATE) AS `created_date`
+FROM ${ref("birddatabase_account")}
+WHERE SAFE_CAST(`date` AS DATE) >= DATE '1994-01-01'
+QUALIFY ROW_NUMBER() OVER (PARTITION BY `account_id` ORDER BY `date` DESC) = 1
+)
+WHERE NOT ((`frequency` IS NULL OR `frequency` IN ('POPLATEK MESICNE', 'POPLATEK TYDNE', 'POPLATEK PO OBRATU')))
