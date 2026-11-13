@@ -327,7 +327,7 @@ boxes:
       refresh:
         mode: batch
         cron: 17 3 * * *
-        time_zone: America/Argentina/Buenos_Aires
+        time_zone: America/Buenos_Aires
         load: full
         cursor: null
 arrows:
