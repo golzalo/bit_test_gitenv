@@ -2,7 +2,7 @@ config {
   "type": "table",
   "schema": "silver",
   "name": "loans",
-  "description": "BIRD loans approved from 1994-01-01 onwards, typed and deduplicated on loan_id, one row per loan (617 rows in dev). Status is A finished OK, B finished unpaid, C running OK or D running in debt; rows with a null loan_id or another status go to loans_quarantine.",
+  "description": "BIRD loans approved from 1994-01-01 onwards, typed and deduplicated on loan_id, one row per loan (662 rows in dev as of 2026-11-13; grows as bronze loan loads new rows). Status is A finished OK, B finished unpaid, C running OK or D running in debt; rows with a null loan_id or another status go to loans_quarantine.",
   "columns": {
     "loan_id": "Loan identifier.",
     "account_id": "Account the loan belongs to.",
