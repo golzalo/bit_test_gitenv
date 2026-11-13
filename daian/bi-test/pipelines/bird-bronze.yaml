@@ -1,0 +1,341 @@
+# A pipeline of daian: its boxes and arrows, and the generated files it owns. daian writes this file at every edit.
+version: 1
+generator: 1
+pipeline: bird-bronze
+name: BIRD bronze
+description: Copies BIRD banking tables (loan, account, district) from the birddatabase MySQL source into bronze.
+boxes:
+  - id: cxdcs7wd
+    kind: source
+    name: bird_loan
+    settings:
+      table: loan
+      schema: null
+      database: BIRD
+      connector: birddatabase
+  - id: vdd1u595
+    kind: source
+    name: bird_account
+    settings:
+      table: account
+      schema: null
+      database: BIRD
+      connector: birddatabase
+  - id: tp3nq8m1
+    kind: source
+    name: bird_district
+    settings:
+      table: district
+      schema: null
+      database: BIRD
+      connector: birddatabase
+  - id: a9j3moaz
+    kind: bronze
+    name: birddatabase_loan
+    settings:
+      key:
+        - loan_id
+      refresh:
+        cron: "*/5 * * * *"
+        load: incremental
+        mode: batch
+        cursor: date
+        time_zone: America/Buenos_Aires
+  - id: 5n780rul
+    kind: bronze
+    name: birddatabase_account
+    settings:
+      key:
+        - account_id
+      refresh:
+        on: api
+        mode: trigger
+        after: null
+  - id: y3s3yomi
+    kind: bronze
+    name: birddatabase_district
+    settings:
+      key:
+        - district_id
+      refresh:
+        on: after
+        mode: trigger
+        after: 5n780rul
+  - id: nnyhh7jc
+    kind: silver
+    name: loans
+    settings:
+      key:
+        - loan_id
+      sql: |-
+        SELECT
+          SAFE_CAST(`loan_id` AS INT64) AS `loan_id`,
+          SAFE_CAST(`account_id` AS INT64) AS `account_id`,
+          SAFE_CAST(`date` AS DATE) AS `approved_date`,
+          SAFE_CAST(`amount` AS INT64) AS `amount`,
+          SAFE_CAST(`duration` AS INT64) AS `duration_months`,
+          SAFE_CAST(`payments` AS FLOAT64) AS `monthly_payment`,
+          `status`
+        FROM {birddatabase_loan}
+        WHERE SAFE_CAST(`date` AS DATE) >= DATE '1994-01-01'
+        QUALIFY ROW_NUMBER() OVER (PARTITION BY `loan_id` ORDER BY `date` DESC) = 1
+      checks:
+        - type: not_null
+          columns:
+            - loan_id
+          severity: error
+        - type: unique
+          columns:
+            - loan_id
+          severity: error
+        - type: accepted_values
+          column: status
+          values:
+            - A
+            - B
+            - C
+            - D
+          severity: error
+      columns:
+        - name: loan_id
+          description: Loan identifier.
+        - name: account_id
+          description: Account the loan belongs to.
+        - name: approved_date
+          description: Date the loan was approved.
+        - name: amount
+          description: Approved amount.
+        - name: duration_months
+          description: Loan duration in months.
+        - name: monthly_payment
+          description: Monthly payment.
+        - name: status
+          description: "Repayment status: A finished OK, B finished unpaid, C running OK, D running in debt."
+      quarantine: true
+      description: BIRD loans approved from 1994-01-01 onwards, typed and deduplicated on loan_id, one row per loan (617 rows in dev). Status is A finished OK, B finished unpaid, C running OK or D running in debt; rows with a null loan_id or another status go to loans_quarantine.
+      materialize: table
+  - id: na4aulhh
+    kind: silver
+    name: accounts
+    settings:
+      key:
+        - account_id
+      sql: |-
+        SELECT
+          SAFE_CAST(`account_id` AS INT64) AS `account_id`,
+          SAFE_CAST(`district_id` AS INT64) AS `district_id`,
+          `frequency`,
+          SAFE_CAST(`date` AS DATE) AS `created_date`
+        FROM {birddatabase_account}
+        WHERE SAFE_CAST(`date` AS DATE) >= DATE '1994-01-01'
+        QUALIFY ROW_NUMBER() OVER (PARTITION BY `account_id` ORDER BY `date` DESC) = 1
+      checks:
+        - type: not_null
+          columns:
+            - account_id
+          severity: error
+        - type: unique
+          columns:
+            - account_id
+          severity: error
+        - type: accepted_values
+          column: frequency
+          values:
+            - POPLATEK MESICNE
+            - POPLATEK TYDNE
+            - POPLATEK PO OBRATU
+          severity: error
+      columns:
+        - name: account_id
+          description: Account identifier.
+        - name: district_id
+          description: District of the account's branch.
+        - name: frequency
+          description: Statement frequency code.
+        - name: created_date
+          description: Date the account was created.
+      quarantine: true
+      description: BIRD accounts created from 1994-01-01 onwards, typed and deduplicated on account_id, one row per account (3,361 rows in dev). Rows with a null account_id or an unknown frequency go to accounts_quarantine.
+      materialize: table
+  - id: 6jhgyqfb
+    kind: silver
+    name: loans_enriched
+    settings:
+      key:
+        - loan_id
+      sql: |-
+        SELECT
+          l.`loan_id`,
+          l.`account_id`,
+          a.`district_id`,
+          d.`district_name`,
+          d.`region`,
+          l.`approved_date`,
+          l.`amount`,
+          l.`duration_months`,
+          l.`monthly_payment`,
+          l.`status`
+        FROM {loans} AS l
+        LEFT JOIN (
+          SELECT
+            SAFE_CAST(`account_id` AS INT64) AS `account_id`,
+            SAFE_CAST(`district_id` AS INT64) AS `district_id`
+          FROM {birddatabase_account}
+          QUALIFY ROW_NUMBER() OVER (PARTITION BY SAFE_CAST(`account_id` AS INT64) ORDER BY `_loaded_at` DESC) = 1
+        ) AS a ON a.`account_id` = l.`account_id`
+        LEFT JOIN (
+          SELECT
+            SAFE_CAST(`district_id` AS INT64) AS `district_id`,
+            SAFE_CAST(`A2` AS STRING) AS `district_name`,
+            SAFE_CAST(`A3` AS STRING) AS `region`
+          FROM {birddatabase_district}
+          QUALIFY ROW_NUMBER() OVER (PARTITION BY SAFE_CAST(`district_id` AS INT64) ORDER BY `_loaded_at` DESC) = 1
+        ) AS d ON d.`district_id` = a.`district_id`
+      checks:
+        - type: not_null
+          columns:
+            - loan_id
+        - type: unique
+          columns:
+            - loan_id
+        - type: not_null
+          columns:
+            - district_id
+            - district_name
+            - region
+        - type: accepted_values
+          column: status
+          values:
+            - A
+            - B
+            - C
+            - D
+      columns:
+        - name: loan_id
+          description: Loan identifier
+        - name: account_id
+          description: Account the loan belongs to
+        - name: district_id
+          description: District of the account's branch
+        - name: district_name
+          description: District name (BIRD district.A2)
+        - name: region
+          description: Region of the district (BIRD district.A3)
+        - name: approved_date
+          description: Date the loan was approved
+        - name: amount
+          description: Loan amount
+        - name: duration_months
+          description: Loan duration in months
+        - name: monthly_payment
+          description: Monthly payment
+        - name: status
+          description: "Loan status code: A, B, C or D"
+      description: BIRD loans (from 1994-01-01, per the loans box) with the district and region of their account, one row per loan_id. District comes from the bronze account copy so loans on accounts opened before 1994 keep it.
+      materialize: table
+  - id: a1c1h6nc
+    kind: gold
+    name: loans_by_region_status
+    settings:
+      key:
+        - region
+        - status
+      sql: |-
+        SELECT
+          `region`,
+          `status`,
+          COUNT(*) AS `loan_count`,
+          SUM(`amount`) AS `total_amount`
+        FROM {loans_enriched}
+        GROUP BY `region`, `status`
+      checks:
+        - type: not_null
+          columns:
+            - region
+            - status
+        - type: unique
+          columns:
+            - region
+            - status
+      columns:
+        - name: region
+          description: Region of the account's district (BIRD district.A3)
+        - name: status
+          description: "Loan status code: A, B, C or D"
+        - name: loan_count
+          description: Number of loans
+        - name: total_amount
+          description: Sum of loan amounts
+      description: Number of loans and total loan amount per region and loan status, for BIRD loans approved from 1994-01-01.
+      materialize: view
+  - id: 060r68b1
+    kind: gold
+    name: loans_by_status
+    settings:
+      sql: |-
+        SELECT
+          `status`,
+          CASE `status`
+            WHEN 'A' THEN 'Finished OK'
+            WHEN 'B' THEN 'Finished unpaid'
+            WHEN 'C' THEN 'Running OK'
+            WHEN 'D' THEN 'Running in debt'
+          END AS `status_name`,
+          COUNT(*) AS `loan_count`,
+          SUM(`amount`) AS `total_amount`,
+          AVG(`amount`) AS `avg_amount`
+        FROM {loans}
+        GROUP BY `status`
+      materialize: view
+      key:
+        - status
+      checks:
+        - type: not_null
+          columns:
+            - status
+          severity: error
+        - type: unique
+          columns:
+            - status
+          severity: error
+      description: Number of loans, total and average loan amount per loan status, for BIRD loans approved from 1994-01-01. One row per status (key status); expect 4 rows (A, B, C, D).
+      columns:
+        - name: status
+          description: "Loan status code: A, B, C or D"
+        - name: status_name
+          description: "Status in words: A finished OK, B finished unpaid, C running OK, D running in debt"
+        - name: loan_count
+          description: Number of loans with this status
+        - name: total_amount
+          description: Sum of loan amounts
+        - name: avg_amount
+          description: Average loan amount
+arrows:
+  - from: cxdcs7wd
+    to: a9j3moaz
+  - from: vdd1u595
+    to: 5n780rul
+  - from: tp3nq8m1
+    to: y3s3yomi
+  - from: a9j3moaz
+    to: nnyhh7jc
+  - from: 5n780rul
+    to: na4aulhh
+  - from: nnyhh7jc
+    to: 6jhgyqfb
+  - from: y3s3yomi
+    to: 6jhgyqfb
+  - from: 5n780rul
+    to: 6jhgyqfb
+  - from: 6jhgyqfb
+    to: a1c1h6nc
+  - from: nnyhh7jc
+    to: 060r68b1
+files:
+  - definitions/daian/bi-test/bird-bronze/gold/loans_by_region_status.sqlx
+  - definitions/daian/bi-test/bird-bronze/gold/loans_by_status.sqlx
+  - definitions/daian/bi-test/bird-bronze/silver/accounts.sqlx
+  - definitions/daian/bi-test/bird-bronze/silver/accounts_quarantine.sqlx
+  - definitions/daian/bi-test/bird-bronze/silver/loans.sqlx
+  - definitions/daian/bi-test/bird-bronze/silver/loans_enriched.sqlx
+  - definitions/daian/bi-test/bird-bronze/silver/loans_quarantine.sqlx

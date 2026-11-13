@@ -1,0 +1,36 @@
+config {
+  "type": "view",
+  "schema": "gold",
+  "name": "loans_by_region_status",
+  "description": "Number of loans and total loan amount per region and loan status, for BIRD loans approved from 1994-01-01.",
+  "columns": {
+    "region": "Region of the account's district (BIRD district.A3)",
+    "status": "Loan status code: A, B, C or D",
+    "loan_count": "Number of loans",
+    "total_amount": "Sum of loan amounts"
+  },
+  "assertions": {
+    "nonNull": [
+      "region",
+      "status"
+    ],
+    "uniqueKeys": [
+      [
+        "region",
+        "status"
+      ]
+    ]
+  },
+  "tags": [
+    "daian",
+    "daian-bi-test-bird-bronze"
+  ]
+}
+
+SELECT
+  `region`,
+  `status`,
+  COUNT(*) AS `loan_count`,
+  SUM(`amount`) AS `total_amount`
+FROM ${ref("loans_enriched")}
+GROUP BY `region`, `status`

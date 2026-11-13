@@ -1,0 +1,5 @@
+# Written by daian for a repository that had none; yours to change.
+defaultProject: bi-test-golzalo-prod
+defaultDataset: silver
+defaultAssertionDataset: silver
+dataformCoreVersion: 3.0.0

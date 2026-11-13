@@ -1,0 +1,48 @@
+config {
+  "type": "table",
+  "schema": "silver",
+  "name": "loans",
+  "description": "BIRD loans approved from 1994-01-01 onwards, typed and deduplicated on loan_id, one row per loan (617 rows in dev). Status is A finished OK, B finished unpaid, C running OK or D running in debt; rows with a null loan_id or another status go to loans_quarantine.",
+  "columns": {
+    "loan_id": "Loan identifier.",
+    "account_id": "Account the loan belongs to.",
+    "approved_date": "Date the loan was approved.",
+    "amount": "Approved amount.",
+    "duration_months": "Loan duration in months.",
+    "monthly_payment": "Monthly payment.",
+    "status": "Repayment status: A finished OK, B finished unpaid, C running OK, D running in debt."
+  },
+  "assertions": {
+    "nonNull": [
+      "loan_id"
+    ],
+    "uniqueKeys": [
+      [
+        "loan_id"
+      ]
+    ],
+    "rowConditions": [
+      "status IS NULL OR status IN ('A', 'B', 'C', 'D')"
+    ]
+  },
+  "tags": [
+    "daian",
+    "daian-bi-test-bird-bronze"
+  ]
+}
+
+SELECT * FROM (
+SELECT
+  SAFE_CAST(`loan_id` AS INT64) AS `loan_id`,
+  SAFE_CAST(`account_id` AS INT64) AS `account_id`,
+  SAFE_CAST(`date` AS DATE) AS `approved_date`,
+  SAFE_CAST(`amount` AS INT64) AS `amount`,
+  SAFE_CAST(`duration` AS INT64) AS `duration_months`,
+  SAFE_CAST(`payments` AS FLOAT64) AS `monthly_payment`,
+  `status`
+FROM ${ref("birddatabase_loan")}
+WHERE SAFE_CAST(`date` AS DATE) >= DATE '1994-01-01'
+QUALIFY ROW_NUMBER() OVER (PARTITION BY `loan_id` ORDER BY `date` DESC) = 1
+)
+WHERE `loan_id` IS NOT NULL
+  AND (`status` IS NULL OR `status` IN ('A', 'B', 'C', 'D'))
