@@ -1,7 +1,7 @@
 config {
   "type": "table",
   "schema": "silver",
-  "name": "accounts",
+  "name": "account_districts",
   "description": "One row per bank account (key: account_id) with the district it belongs to. Expect about 4,500 rows, one per account in BIRD.account; every account has a district.",
   "columns": {
     "account_id": "The account's id in the BIRD bank.",

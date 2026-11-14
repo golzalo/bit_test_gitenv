@@ -45,7 +45,7 @@ boxes:
         after: 7cj0n30v
   - id: qs2cbf1q
     kind: silver
-    name: accounts
+    name: account_districts
     settings:
       sql: |-
         SELECT
@@ -114,5 +114,5 @@ arrows:
   - from: eqwq1kmq
     to: qs2cbf1q
 files:
-  - definitions/daian/bi-test/bird-accounts/silver/accounts.sqlx
-  - definitions/daian/bi-test/bird-accounts/silver/accounts_quarantine.sqlx
+  - definitions/daian/bi-test/bird-accounts/silver/account_districts.sqlx
+  - definitions/daian/bi-test/bird-accounts/silver/account_districts_quarantine.sqlx

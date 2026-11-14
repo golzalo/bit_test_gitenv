@@ -1,8 +1,8 @@
 config {
   "type": "incremental",
   "schema": "silver",
-  "name": "accounts_quarantine",
-  "description": "Rows of accounts that failed a check, kept apart by daian.",
+  "name": "account_districts_quarantine",
+  "description": "Rows of account_districts that failed a check, kept apart by daian.",
   "tags": [
     "daian",
     "daian-bi-test-bird-accounts"
