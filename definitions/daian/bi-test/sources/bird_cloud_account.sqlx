@@ -1,0 +1,5 @@
+config {
+  "type": "declaration",
+  "schema": "bronze_shop",
+  "name": "bird_cloud_account"
+}

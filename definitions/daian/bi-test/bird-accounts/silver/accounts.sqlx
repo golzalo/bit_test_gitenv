@@ -1,0 +1,56 @@
+config {
+  "type": "table",
+  "schema": "silver",
+  "name": "accounts",
+  "description": "One row per bank account (key: account_id) with the district it belongs to. Expect about 4,500 rows, one per account in BIRD.account; every account has a district.",
+  "columns": {
+    "account_id": "The account's id in the BIRD bank.",
+    "opening_date": "Date the account was opened.",
+    "statement_frequency": "How often statements are issued: monthly, weekly or after transaction (from the Czech POPLATEK codes).",
+    "district_name": "Name of the account's district.",
+    "region": "Region the district belongs to (8 regions, e.g. Prague, south Moravia).",
+    "inhabitants": "Number of inhabitants of the district."
+  },
+  "assertions": {
+    "nonNull": [
+      "account_id",
+      "opening_date",
+      "district_name",
+      "region",
+      "inhabitants"
+    ],
+    "uniqueKeys": [
+      [
+        "account_id"
+      ]
+    ],
+    "rowConditions": [
+      "statement_frequency IS NULL OR statement_frequency IN ('monthly', 'weekly', 'after transaction')"
+    ]
+  },
+  "tags": [
+    "daian",
+    "daian-bi-test-bird-accounts"
+  ]
+}
+
+SELECT * FROM (
+SELECT
+  SAFE_CAST(a.`account_id` AS INT64) AS account_id,
+  SAFE_CAST(a.`date` AS DATE) AS opening_date,
+  CASE TRIM(a.`frequency`)
+    WHEN 'POPLATEK MESICNE' THEN 'monthly'
+    WHEN 'POPLATEK TYDNE' THEN 'weekly'
+    WHEN 'POPLATEK PO OBRATU' THEN 'after transaction'
+  END AS statement_frequency,
+  d.`A2` AS district_name,
+  d.`A3` AS region,
+  SAFE_CAST(d.`A4` AS INT64) AS inhabitants
+FROM ${ref("bird_cloud_account")} AS a
+LEFT JOIN ${ref("bird_cloud_district")} AS d
+  ON SAFE_CAST(d.`district_id` AS INT64) = SAFE_CAST(a.`district_id` AS INT64)
+QUALIFY ROW_NUMBER() OVER (PARTITION BY SAFE_CAST(a.`account_id` AS INT64) ORDER BY SAFE_CAST(a.`date` AS DATE) DESC) = 1
+)
+WHERE `account_id` IS NOT NULL
+  AND `opening_date` IS NOT NULL AND `district_name` IS NOT NULL AND `region` IS NOT NULL AND `inhabitants` IS NOT NULL
+  AND (`statement_frequency` IS NULL OR `statement_frequency` IN ('monthly', 'weekly', 'after transaction'))
