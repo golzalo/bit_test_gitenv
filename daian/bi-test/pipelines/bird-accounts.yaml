@@ -104,6 +104,32 @@ boxes:
         - name: inhabitants
           description: Number of inhabitants of the district.
       quarantine: true
+  - id: w7fbshwh
+    kind: gold
+    name: south_moravia_monthly_accounts
+    settings:
+      sql: |-
+        SELECT
+          `account_id`,
+          `opening_date`,
+          `district_name`
+        FROM {account_districts}
+        WHERE `statement_frequency` = 'monthly'
+          AND `opening_date` >= DATE '1996-01-01'
+          AND `region` = 'south Moravia'
+        ORDER BY `opening_date` DESC, `account_id` DESC
+      materialize: view
+      key:
+        - account_id
+      checks: []
+      description: "Accounts with monthly statements opened on or after 1 January 1996 in the south Moravia region, newest first. One row per account (key: account_id); expect about 349 rows across 14 districts."
+      columns:
+        - name: account_id
+          description: The account's id in the BIRD bank.
+        - name: opening_date
+          description: Date the account was opened (1996 or later).
+        - name: district_name
+          description: Name of the account's district in south Moravia.
 arrows:
   - from: twdnjegl
     to: 7cj0n30v
@@ -113,6 +139,9 @@ arrows:
     to: qs2cbf1q
   - from: eqwq1kmq
     to: qs2cbf1q
+  - from: qs2cbf1q
+    to: w7fbshwh
 files:
+  - definitions/daian/bi-test/bird-accounts/gold/south_moravia_monthly_accounts.sqlx
   - definitions/daian/bi-test/bird-accounts/silver/account_districts.sqlx
   - definitions/daian/bi-test/bird-accounts/silver/account_districts_quarantine.sqlx

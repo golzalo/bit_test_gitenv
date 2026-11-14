@@ -1,0 +1,25 @@
+config {
+  "type": "view",
+  "schema": "gold",
+  "name": "south_moravia_monthly_accounts",
+  "description": "Accounts with monthly statements opened on or after 1 January 1996 in the south Moravia region, newest first. One row per account (key: account_id); expect about 349 rows across 14 districts.",
+  "columns": {
+    "account_id": "The account's id in the BIRD bank.",
+    "opening_date": "Date the account was opened (1996 or later).",
+    "district_name": "Name of the account's district in south Moravia."
+  },
+  "tags": [
+    "daian",
+    "daian-bi-test-bird-accounts"
+  ]
+}
+
+SELECT
+  `account_id`,
+  `opening_date`,
+  `district_name`
+FROM ${ref("account_districts")}
+WHERE `statement_frequency` = 'monthly'
+  AND `opening_date` >= DATE '1996-01-01'
+  AND `region` = 'south Moravia'
+ORDER BY `opening_date` DESC, `account_id` DESC
