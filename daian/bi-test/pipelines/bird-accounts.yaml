@@ -1,0 +1,51 @@
+# A pipeline of daian: its boxes and arrows, and the generated files it owns. daian writes this file at every edit.
+version: 1
+generator: 1
+pipeline: bird-accounts
+name: BIRD accounts
+description: Bronze copies of BIRD account and district from bird-cloud.
+boxes:
+  - id: twdnjegl
+    kind: source
+    name: account
+    settings:
+      connector: bird-cloud
+      database: BIRD
+      schema: null
+      table: account
+  - id: i13dlt0t
+    kind: source
+    name: district
+    settings:
+      connector: bird-cloud
+      database: BIRD
+      schema: null
+      table: district
+  - id: 7cj0n30v
+    kind: bronze
+    name: bird_cloud_account
+    settings:
+      key:
+        - account_id
+      refresh:
+        mode: batch
+        cron: "*/10 * * * *"
+        time_zone: America/Buenos_Aires
+        load: incremental
+        cursor: date
+  - id: eqwq1kmq
+    kind: bronze
+    name: bird_cloud_district
+    settings:
+      key:
+        - district_id
+      refresh:
+        mode: trigger
+        on: after
+        after: 7cj0n30v
+arrows:
+  - from: twdnjegl
+    to: 7cj0n30v
+  - from: i13dlt0t
+    to: eqwq1kmq
+files: []
